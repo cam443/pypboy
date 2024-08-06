@@ -7,6 +7,8 @@ import time
 from pygame.constants import HWSURFACE
 import settings
 
+from pypboy.crt_shader import CRTShader
+
 class Engine(object):
 
     EVENTS_UPDATE = pygame.USEREVENT + 1
@@ -41,44 +43,48 @@ class Engine(object):
         self.prev_fps_time = 0
         self.fps_average = deque()
 
-    def render(self):
+        self.crt_shader = CRTShader((width, height))
 
-        self.current_time= time.time()
+    def render(self):
+        self.current_time = time.time()
         self.delta_time = self.current_time - self.prev_time
 
         if self.delta_time >= settings.fps_rate:
             self.prev_time = self.current_time
 
-            self.root_persitant.clear(self.screen, self.background) #Remove background from render queue?
+            self.root_persitant.clear(self.screen, self.background)
             self.root_persitant.render()
             self.root_persitant.draw(self.screen)
             for group in self.groups:
                 group.render()
                 group.draw(self.screen)
 
-            # if hasattr(self, 'active'):
-            #     self.active.render()
+            # Apply CRT effect
+            shaded_surface = self.crt_shader.apply(self.screen)
+            # Rotate the shaded surface by -90 degrees and flip it horizontally
+            rotated_surface = pygame.transform.rotate(shaded_surface, 270)
+            flipped_surface = pygame.transform.flip(rotated_surface, True, False)
+            
+            # Blit the corrected surface to the screen
+            self.screen.blit(flipped_surface, (0, 0))
 
             current_time = time.time()
             fps_delta_time = current_time - self.prev_fps_time
             self.prev_fps_time = current_time
 
-            #  FPS debugging
+            # FPS debugging
             if fps_delta_time:
                 fps = int(1 / fps_delta_time)
 
                 if len(self.fps_average) > 6:
                     self.fps_average.popleft()
-                    # self.fps_average.pop()
                 self.fps_average.append(fps)
                 fps = int(statistics.mean(self.fps_average))
-                # self.screen.putchars(str(fps) + " " + str(self.fps_average), 0, 1)
                 settings.FreeRobotoB[33].render_to(self.screen, (0, 0), str(fps), settings.bright, settings.black)
 
             # Wait until frame rate hits
             if fps_delta_time < settings.fps_rate:
                 wait = int(1000 * settings.fps_rate - fps_delta_time)
-                # print("Waiting for", wait, fps_delta_time)
                 pygame.time.wait(wait)
 
             pygame.display.flip()
